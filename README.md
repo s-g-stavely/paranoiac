@@ -2,19 +2,23 @@
 
 Uses Claude Code to scan a repo for vulnerabilities, bugs, or anything else of interest.
 
+## Installation
+
+```
+go install github.com/s-g-stavely/paranoiac@latest
+```
+
 ## Usage
 
 ```
-go build -o paranoiac .
-
 # scan for security vulnerabilities (default)
-./paranoiac -repo /path/to/repo
+paranoiac -repo /path/to/repo
 
 # scan for bugs
-./paranoiac -repo /path/to/repo -mode bugs
+paranoiac -repo /path/to/repo -mode bugs
 
 # scan for something else
-./paranoiac -repo /path/to/repo -mode custom -custom-prompt "find performance issues"
+paranoiac -repo /path/to/repo -mode custom -custom-prompt "find performance issues"
 ```
 
 ## Flags
