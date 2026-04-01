@@ -8,8 +8,7 @@
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
-*.test
+paranoiac
 
 # Code coverage profiles and other test artifacts
 *.out
