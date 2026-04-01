@@ -1,6 +1,6 @@
 # paranoiac
 
-Uses Claude Code to scan a repo for vulnerabilities, bugs, or anything else interesting.
+Uses Claude Code to scan a repo for vulnerabilities, bugs, or anything else of interest.
 
 ## Usage
 
