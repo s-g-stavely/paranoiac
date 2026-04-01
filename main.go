@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,7 +23,6 @@ var languageExtensions = map[string][]string{
 }
 
 type Vulnerability struct {
-	ID                  string   `json:"id"`
 	ShortDescription    string   `json:"short_description"`
 	DetailedDescription string   `json:"detailed_description"`
 	Locations           []string `json:"locations"`
@@ -55,7 +53,14 @@ func main() {
 	repoPath := flag.String("repo", ".", "path to the repository to scan")
 	maxTurns := flag.Int("max-turns", 50, "max conversation turns per Claude instance")
 	timeout := flag.Duration("timeout", 15*time.Minute, "timeout per Claude instance")
+	mode := flag.String("mode", "security", "what to scan for: security, bugs, or custom")
+	customPrompt := flag.String("custom-prompt", "", "description of what issues to look for (requires -mode=custom)")
 	flag.Parse()
+
+	scanPrompt := buildScanPrompt(*mode, *customPrompt)
+	if scanPrompt == "" {
+		log.Fatalf("-mode must be one of: security, bugs, custom")
+	}
 
 	absRepo, err := filepath.Abs(*repoPath)
 	if err != nil {
@@ -116,7 +121,7 @@ func main() {
 			defer func() { <-sem }()
 
 			log.Printf("scanning %s", f)
-			vulns, err := scanFile(absRepo, f, *maxTurns, *timeout)
+			vulns, err := scanFile(absRepo, f, scanPrompt, *maxTurns, *timeout)
 			if err != nil {
 				log.Printf("error scanning %s: %v", f, err)
 				// Still mark as scanned so we don't retry on resume.
@@ -229,10 +234,10 @@ func filterByExtension(_ string, files []string, exts map[string]bool) []string 
 	return result
 }
 
-func scanFile(repoPath, file string, maxTurns int, timeout time.Duration) ([]Vulnerability, error) {
-	prompt := fmt.Sprintf(`You are a security auditor. Analyze the file %q in this repository for security vulnerabilities, bugs, and issues.
-
-Start by reading the file, then follow any relevant code paths by reading other files as needed. Look for:
+func buildScanPrompt(mode, customPrompt string) string {
+	switch mode {
+	case "security":
+		return `You are a security auditor. Look for security vulnerabilities including:
 - Injection vulnerabilities (SQL, command, XSS, etc.)
 - Authentication/authorization flaws
 - Insecure cryptography or random number generation
@@ -242,14 +247,45 @@ Start by reading the file, then follow any relevant code paths by reading other 
 - Insecure deserialization
 - Hardcoded secrets or credentials
 - Missing input validation at trust boundaries
-- Logic errors that could be exploited
+- Logic errors that could be exploited`
+
+	case "bugs":
+		return `You are a code reviewer looking for bugs. Look for:
+- Nil/null pointer dereferences
+- Off-by-one errors
+- Resource leaks (unclosed files, connections, channels)
+- Deadlocks and race conditions
+- Unhandled error cases
+- Incorrect type conversions or truncations
+- Logic errors and incorrect control flow
+- Incorrect API usage
+- Missing bounds checks
+- Goroutine/thread safety issues`
+
+	case "custom":
+		if customPrompt == "" {
+			log.Fatal("-custom-prompt is required when -mode=custom")
+		}
+		return customPrompt
+
+	default:
+		return ""
+	}
+}
+
+func scanFile(repoPath, file, scanInstructions string, maxTurns int, timeout time.Duration) ([]Vulnerability, error) {
+	prompt := fmt.Sprintf(`Analyze the file %q in this repository.
+
+Start by reading the file, then follow any relevant code paths by reading other files as needed.
+
+%s
 
 Only report issues you are confident about. Do not report speculative or low-confidence findings.
 
 You MUST respond with ONLY a JSON object in this exact format, with no other text before or after:
-{"vulnerabilities": [{"short_description": "brief title", "detailed_description": "full explanation of the vulnerability and its impact", "locations": [{"file": "path/to/file.go", "line": 42}]}]}
+{"vulnerabilities": [{"short_description": "brief title", "detailed_description": "full explanation of the issue and its impact", "locations": [{"file": "path/to/file.go", "line": 42}]}]}
 
-If you find no vulnerabilities, respond with: {"vulnerabilities": []}`, file)
+If you find no issues, respond with: {"vulnerabilities": []}`, file, scanInstructions)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -304,9 +340,7 @@ func parseClaudeOutput(out []byte, sourceFile string) ([]Vulnerability, error) {
 				locs = append(locs, l.File)
 			}
 		}
-		id := computeID(v.ShortDescription, locs)
 		vulns = append(vulns, Vulnerability{
-			ID:                  id,
 			ShortDescription:    v.ShortDescription,
 			DetailedDescription: v.DetailedDescription,
 			Locations:           locs,
@@ -327,14 +361,6 @@ func stripCodeFences(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-func computeID(description string, locations []string) string {
-	h := sha256.New()
-	h.Write([]byte(description))
-	for _, l := range locations {
-		h.Write([]byte(l))
-	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:16]
-}
 
 // dedup asks Claude to compare candidate vulnerabilities against the existing
 // output file and return only the ones that are genuinely new.
