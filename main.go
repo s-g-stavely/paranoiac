@@ -237,30 +237,10 @@ func filterByExtension(_ string, files []string, exts map[string]bool) []string 
 func buildScanPrompt(mode, customPrompt string) string {
 	switch mode {
 	case "security":
-		return `You are a security auditor. Look for security vulnerabilities including:
-- Injection vulnerabilities (SQL, command, XSS, etc.)
-- Authentication/authorization flaws
-- Insecure cryptography or random number generation
-- Path traversal
-- Race conditions
-- Buffer overflows or memory safety issues
-- Insecure deserialization
-- Hardcoded secrets or credentials
-- Missing input validation at trust boundaries
-- Logic errors that could be exploited`
+		return `You are a security auditor. Look for security vulnerabilities.`
 
 	case "bugs":
-		return `You are a code reviewer looking for bugs. Look for:
-- Nil/null pointer dereferences
-- Off-by-one errors
-- Resource leaks (unclosed files, connections, channels)
-- Deadlocks and race conditions
-- Unhandled error cases
-- Incorrect type conversions or truncations
-- Logic errors and incorrect control flow
-- Incorrect API usage
-- Missing bounds checks
-- Goroutine/thread safety issues`
+		return `You are a code reviewer looking for bugs. Look for logic errors, unhandled error/corner cases, or anything that won't work correctly.`
 
 	case "custom":
 		if customPrompt == "" {
@@ -360,7 +340,6 @@ func stripCodeFences(s string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
 
 // dedup asks Claude to compare candidate vulnerabilities against the existing
 // output file and return only the ones that are genuinely new.
