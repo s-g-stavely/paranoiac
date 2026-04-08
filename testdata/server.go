@@ -10,7 +10,6 @@ import (
 
 var db *sql.DB
 
-// SQL injection: user input concatenated directly into query.
 func handleSearch(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query().Get("username")
 	query := fmt.Sprintf("SELECT * FROM users WHERE username = '%s'", username)
@@ -23,7 +22,6 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "results returned")
 }
 
-// Command injection: user input passed directly to shell.
 func handlePing(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
 	cmd := exec.Command("sh", "-c", "ping -c 1 "+host)
@@ -35,7 +33,6 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
-// Path traversal: user controls file path with no sanitization.
 func handleReadFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("file")
 	data, err := os.ReadFile("/var/data/" + filename)
@@ -45,9 +42,6 @@ func handleReadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(data)
 }
-
-// Hardcoded secret.
-var apiKey = "sk-live-abc123secretkey456"
 
 func main() {
 	http.HandleFunc("/search", handleSearch)
